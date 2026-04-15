@@ -5,6 +5,7 @@
 //! repository root.
 
 pub mod error;
+pub mod parse;
 pub mod types;
 
 pub use error::{NpfError, Result};
