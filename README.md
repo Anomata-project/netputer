@@ -33,9 +33,9 @@ A Raspberry Pi (or any 64-bit machine) running a custom OS that:
 
 Every network is a single `.npf` file (Netputer Package Format). Self-describing flat binary. No runtime dependencies. No external schema. Typically 10KB–500KB.
 
-Any tool that produces a spec-compliant `.npf` file can target Netputer — a training framework exporter, an LLM agent, a hand-written binary. The spec is the contract.
+Any tool that produces a spec-compliant `.npf` file can target Netputer — a training framework exporter, a code-generation tool, a hand-written binary. The spec is the contract.
 
-→ [NPF Format Specification v1.0](./spec/npf-spec-v1.0.md)
+→ [NPF Format Specification v1.3](./spec/npf-spec-v1.3.md)
 
 ---
 
@@ -94,4 +94,11 @@ Open an issue or start a discussion. There is no code to PR against yet — that
 ## Further reading
 
 - [White Paper](./docs/netputer-whitepaper.md) — full concept, history, and use cases
-- [NPF Format Specification v1.0](./spec/npf-spec-v1.0.md) — the file format in full detail
+- [NPF Format Specification v1.3](./spec/npf-spec-v1.3.md) — the file format in full detail
+
+---
+
+## License
+
+- **Documentation** (this README, the white paper, and the NPF specification) is licensed under [Creative Commons Attribution 4.0 International (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/).
+- **Future code** (reference validator, OS, conversion tool) will be licensed under the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0).

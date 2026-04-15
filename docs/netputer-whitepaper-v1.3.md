@@ -1,5 +1,5 @@
 # Netputer: A Tensor-Native Operating System for Small Neural Networks
-**White Paper v1.2**
+**White Paper v1.3**
 
 ---
 
@@ -40,7 +40,7 @@ A LeNet-5 from 1989 still classifies MNIST digits with ~99% accuracy. A small El
 
 ### Third Wave: 2012–Present
 
-AlexNet, TensorFlow, PyTorch, Transformers, and large language models proved that scale works. But most applications do not need scale. Edge computing makes small, fast, local inference valuable again — and LLM coding agents can now generate and export small networks automatically, lowering the barrier to deployment dramatically.
+AlexNet, TensorFlow, PyTorch, Transformers, and large language models proved that scale works. But most applications do not need scale. Edge computing makes small, fast, local inference valuable again, and modern tooling makes exporting small networks easier than ever.
 
 **Netputer connection:** The Netputer is the deployment target for this third-wave edge renaissance.
 
@@ -98,7 +98,7 @@ Every tensor knows its gradient. Every activation can be traced. Debugging is vi
 You bring a single `.npf` file — a self-contained binary containing both architecture and weights. You can generate it by:
 
 - Training on any platform and exporting via our offline conversion tool
-- Having an LLM agent write it directly against the open spec
+- Generating it directly against the open spec with any tool of your choice
 - Writing it by hand (possible but not recommended)
 
 Netputer does not consume ONNX, TensorFlow, or PyTorch models. You convert them offline using a separate tool that runs on your normal development machine. The Netputer itself never sees those formats. The `.npf` spec is open — any tool that produces a valid file can target Netputer.
@@ -106,6 +106,8 @@ Netputer does not consume ONNX, TensorFlow, or PyTorch models. You convert them 
 ---
 
 ## What You See When You Connect a Screen
+
+> **Note:** The screens in this section are aspirational mockups illustrating the intended user experience. No working implementation exists yet. They are included to make the design vision concrete for contributors and reviewers.
 
 **Boot screen (first 2 seconds)**
 
@@ -272,6 +274,7 @@ The Netputer Package Format is an open flat binary format. Any tool that produce
 │   Checksum:   uint32 (CRC32 of weight sec) │
 │   Name len:   uint32                       │
 │   Name:       N bytes, UTF-8               │
+│                (no terminator, no padding) │
 │   Input dims: 4 × uint32                   │
 │   Output dims:4 × uint32                   │
 │   Layer count:uint32                       │
@@ -308,13 +311,13 @@ Unknown type tags cause the runtime to reject the file with a clear error. This 
 ### Hex example: minimal header
 
 ```
-4E 45 54 50   ← magic "NETP"
-01 00 00 00   ← version 1
-00 00 00 00   ← little-endian
-20 00 00 00   ← float32
-A3 4F 2B 11   ← CRC32 checksum
-07 00 00 00   ← name length 7
-6D 79 6E 65 74 00 00   ← "mynet\0\0"
+4E 45 54 50         ← magic "NETP"
+01 00 00 00         ← version 1
+00 00 00 00         ← little-endian
+20 00 00 00         ← float32
+A3 4F 2B 11         ← CRC32 checksum
+05 00 00 00         ← name length 5
+6D 79 6E 65 74      ← "mynet" (5 bytes, no terminator, no padding)
 ...
 ```
 
@@ -322,4 +325,10 @@ A3 4F 2B 11   ← CRC32 checksum
 
 Recurrent layers, BatchNorm, Conv1D, and attention mechanisms are out of scope for v1. The version field in the header ensures future layer types can be added without breaking existing files. A v1 runtime encountering an unknown layer tag rejects the file and reports the unknown tag — it does not attempt to run a partially understood network.
 
-The full specification is maintained as a separate document: **NPF Format Specification v1.0**.
+The full specification is maintained as a separate document: **NPF Format Specification v1.3**.
+
+---
+
+## License
+
+This white paper is licensed under [Creative Commons Attribution 4.0 International (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/). You may share and adapt it for any purpose, including commercially, provided you give appropriate credit to the Netputer project.

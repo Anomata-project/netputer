@@ -1,5 +1,5 @@
 # NPF Format Specification
-**Netputer Package Format — v1.0**
+**Netputer Package Format — v1.3**
 
 ---
 
@@ -7,7 +7,7 @@
 
 The Netputer Package Format (`.npf`) is the native binary format for neural networks on the Netputer OS. A single `.npf` file is fully self-describing: it contains the complete network architecture, all trained weights and biases, and enough metadata to validate and execute the network without any external dependencies.
 
-The format is open. Any tool that produces a spec-compliant `.npf` file can target Netputer — a training framework exporter, an LLM-generated file, a hand-written binary, or a dedicated conversion utility. The spec is the contract.
+The format is open. Any tool that produces a spec-compliant `.npf` file can target Netputer — a training framework exporter, a code-generation tool, a hand-written binary, or a dedicated conversion utility. The spec is the contract.
 
 ---
 
@@ -45,7 +45,7 @@ Total minimum size: 52 bytes + name length.
 | 12 | 4 | uint32 | precision | `32` = float32. Any other value is invalid in v1. |
 | 16 | 4 | uint32 | checksum | CRC32 of the WEIGHTS section (bytes only, not BIASES). |
 | 20 | 4 | uint32 | name_len | Byte length of the name field. May be 0. |
-| 24 | name_len | UTF-8 | name | Human-readable network name. No null terminator required. Empty string is valid. |
+| 24 | name_len | UTF-8 | name | Human-readable network name. No null terminator. No padding. Empty string (name_len = 0) is valid. |
 | 24 + name_len | 16 | 4 × uint32 | input_shape | Up to 4 dimensions. Unused dimensions set to 0. Example: a 28×28 grayscale image = `[1, 28, 28, 0]`. |
 | 40 + name_len | 16 | 4 × uint32 | output_shape | Same encoding as input_shape. |
 | 56 + name_len | 4 | uint32 | layer_count | Number of layer records in the ARCHITECTURE section. |
@@ -53,6 +53,7 @@ Total minimum size: 52 bytes + name length.
 ### Notes
 
 - The runtime must read `name_len` before attempting to read the name field.
+- The name field contains exactly `name_len` bytes of UTF-8 data. There is no null terminator and no padding. The next field (`input_shape`) begins immediately after the last byte of the name.
 - `input_shape` and `output_shape` are informational. The runtime uses them for validation and display. A mismatch between declared shape and actual layer dimensions is a validation error.
 - `layer_count` of 0 is invalid.
 
@@ -208,7 +209,7 @@ A single Dense(2→1) network with ReLU, name "test":
 20 00 00 00   float32
 XX XX XX XX   CRC32 (computed over weight section)
 04 00 00 00   name_len = 4
-74 65 73 74   "test"
+74 65 73 74   "test" (exactly 4 bytes, no terminator, no padding)
 02 00 00 00   input_shape [2, 0, 0, 0]
 00 00 00 00
 00 00 00 00
@@ -275,3 +276,10 @@ npf-validate corrupt.npf
 | Version | Date | Notes |
 |---------|------|-------|
 | 1.0 | — | Initial release. Dense, Conv2D, MaxPool2D, Flatten, ReLU, Tanh, Sigmoid, Softmax. |
+| 1.3 | — | Documentation aligned across spec, whitepaper, and README. Clarified that the name field has no null terminator and no padding. Binary format unchanged (header `version` field remains `1`). |
+
+---
+
+## License
+
+This specification is licensed under [Creative Commons Attribution 4.0 International (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/). You may share and adapt it for any purpose, including commercially, provided you give appropriate credit to the Netputer project.
