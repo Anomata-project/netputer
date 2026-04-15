@@ -18,3 +18,19 @@ thiserror = "1.0"
 crc32fast = "1.4"
 rand = "0.8"
 assert_cmd = "2.0"
+
+# Root package exists solely to host workspace-level integration tests under
+# tools/npf-toolkit/tests/. It has no runtime code of its own.
+[package]
+name = "npf-toolkit"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Workspace-level integration tests for the npf toolkit."
+
+[lib]
+path = "src/lib.rs"
+
+[dev-dependencies]
+npf.workspace = true
+assert_cmd.workspace = true
