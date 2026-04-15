@@ -1,0 +1,10 @@
+[package]
+name = "npf"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Reader, writer, and validator for the Netputer Package Format (.npf)."
+
+[dependencies]
+thiserror.workspace = true
+crc32fast.workspace = true

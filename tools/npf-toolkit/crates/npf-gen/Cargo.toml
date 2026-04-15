@@ -1,0 +1,15 @@
+[package]
+name = "npf-gen"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "CLI generator for example Netputer Package Format (.npf) files."
+
+[[bin]]
+name = "npf-gen"
+path = "src/main.rs"
+
+[dependencies]
+npf.workspace = true
+clap.workspace = true
+rand.workspace = true
