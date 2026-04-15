@@ -1,0 +1,29 @@
+Netputer is dual-licensed.
+
+Copyright (c) 2026 Mika Välimäki and Netputer contributors
+
+Documentation
+-------------
+The README, white paper, NPF specification, and any other Markdown
+files under `docs/` and `spec/` are licensed under the Creative Commons
+Attribution 4.0 International License (CC BY 4.0).
+
+See `LICENSES/CC-BY-4.0.txt` for the full license text, or visit
+https://creativecommons.org/licenses/by/4.0/.
+
+Source code
+-----------
+All source code in this repository — including future code under
+`src/`, `validator/`, `tools/`, and any other code directories — is
+licensed under the Apache License, Version 2.0.
+
+See `LICENSES/Apache-2.0.txt` for the full license text, or visit
+https://www.apache.org/licenses/LICENSE-2.0.
+
+SPDX identifiers
+----------------
+Individual files should carry an SPDX-License-Identifier header
+indicating which of the two licenses applies:
+
+    SPDX-License-Identifier: CC-BY-4.0
+    SPDX-License-Identifier: Apache-2.0
