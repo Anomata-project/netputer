@@ -7,6 +7,7 @@
 pub mod error;
 pub mod parse;
 pub mod types;
+pub mod write;
 
 pub use error::{NpfError, Result};
 pub use types::{
