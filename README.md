@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Netputer
 
 A tensor-native operating system for small neural networks on cheap hardware.

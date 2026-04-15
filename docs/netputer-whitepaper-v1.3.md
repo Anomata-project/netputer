@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Netputer: A Tensor-Native Operating System for Small Neural Networks
 **White Paper v1.3**
 
