@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Set up Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: tools/npf-toolkit
+
+      - name: Check formatting
+        working-directory: tools/npf-toolkit
+        run: cargo fmt --all -- --check
+
+      - name: Run clippy
+        working-directory: tools/npf-toolkit
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Build workspace
+        working-directory: tools/npf-toolkit
+        run: cargo build --workspace --verbose
+
+      - name: Test workspace
+        working-directory: tools/npf-toolkit
+        run: cargo test --workspace --verbose
