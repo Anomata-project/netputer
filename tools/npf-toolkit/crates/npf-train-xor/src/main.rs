@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
+use npf::{Header, Layer, Network};
 use rand::rngs::StdRng;
 use rand::seq::SliceRandom;
 use rand::{Rng, SeedableRng};
 use std::fmt;
+use std::path::{Path, PathBuf};
 
 const INPUT_FEATURES: usize = 2;
 const HIDDEN_FEATURES: usize = 4;
@@ -40,6 +42,12 @@ struct TrainingSummary {
     final_epoch: usize,
     final_loss: f32,
     stopped_early: bool,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+struct ExportResult {
+    path: PathBuf,
+    bytes: Vec<u8>,
 }
 
 impl fmt::Display for TrainingSummary {
@@ -267,16 +275,71 @@ fn train_xor(params: &mut Params, rng: &mut StdRng) -> TrainingSummary {
     }
 }
 
+fn fixture_path() -> PathBuf {
+    PathBuf::from("fixtures").join("xor.npf")
+}
+
+fn network_from_params(params: &Params) -> Network {
+    let mut header = Header::new("xor", [2, 0, 0, 0], [1, 0, 0, 0]);
+    header.layer_count = 4;
+
+    Network {
+        header,
+        layers: vec![
+            Layer::Dense {
+                in_features: INPUT_FEATURES as u32,
+                out_features: HIDDEN_FEATURES as u32,
+            },
+            Layer::Tanh,
+            Layer::Dense {
+                in_features: HIDDEN_FEATURES as u32,
+                out_features: OUTPUT_FEATURES as u32,
+            },
+            Layer::Sigmoid,
+        ],
+        weights: [
+            params.dense1_weights.as_slice(),
+            params.dense2_weights.as_slice(),
+        ]
+        .concat(),
+        biases: [
+            params.dense1_biases.as_slice(),
+            params.dense2_biases.as_slice(),
+        ]
+        .concat(),
+    }
+}
+
+fn export_trained_network(params: &Params, path: &Path) -> Result<ExportResult, String> {
+    let network = network_from_params(params);
+    let bytes = network
+        .to_bytes()
+        .map_err(|err| format!("could not serialize {}: {err}", path.display()))?;
+
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|err| format!("could not create {}: {err}", parent.display()))?;
+    }
+    std::fs::write(path, &bytes).map_err(|err| format!("could not write {}: {err}", path.display()))?;
+
+    Ok(ExportResult {
+        path: path.to_path_buf(),
+        bytes,
+    })
+}
+
 fn main() {
     let mut rng = StdRng::seed_from_u64(RNG_SEED);
     let mut params = init_params(&mut rng);
     let summary = train_xor(&mut params, &mut rng);
+    let export = export_trained_network(&params, &fixture_path()).expect("export xor fixture");
     println!(
-        "trained xor network ({} weights, {} biases) {}",
+        "trained xor network ({} weights, {} biases) {}, wrote {} ({} bytes)",
         params.dense1_weights.len() + params.dense2_weights.len(),
-        params.dense1_biases.len() + params.dense2_biases.len()
-        ,
-        summary
+        params.dense1_biases.len() + params.dense2_biases.len(),
+        summary,
+        export.path.display(),
+        export.bytes.len()
     );
 }
 
