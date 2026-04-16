@@ -1,5 +1,6 @@
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Netputer
+[![CI](https://github.com/Anomata-project/netputer/actions/workflows/ci.yml/badge.svg)](https://github.com/Anomata-project/netputer/actions/workflows/ci.yml)
 
 A tensor-native operating system for small neural networks on cheap hardware.
 
