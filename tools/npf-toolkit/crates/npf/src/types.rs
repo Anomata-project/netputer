@@ -5,10 +5,7 @@ pub const VERSION: u32 = 1;
 pub const ENDIAN_LE: u32 = 0;
 pub const PRECISION_F32: u32 = 32;
 
-// The spec's "Section 1: Header" text says "Total minimum size: 52 bytes + name length",
-// but the offset table totals 60 + name_len (24 prelude + 16 input_shape + 16 output_shape
-// + 4 layer_count). Following the offset table literally, which is also consistent with
-// the hex reference example.
+// Fixed header bytes excluding the variable-length name field.
 pub const HEADER_FIXED_BYTES: usize = 60;
 
 #[repr(u32)]

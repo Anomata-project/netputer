@@ -36,7 +36,7 @@ There is no padding between sections. Offsets are computed from declared sizes.
 
 ## Section 1: Header
 
-Total minimum size: 52 bytes + name length.
+Total minimum size: 60 bytes + name length.
 
 | Offset | Size | Type | Field | Description |
 |--------|------|------|-------|-------------|
