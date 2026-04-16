@@ -36,6 +36,9 @@ pub enum NpfError {
     #[error("file ended before all declared sections were complete (truncation at offset {offset})")]
     Truncation { offset: u64 },
 
+    #[error("file has {extra} unexpected bytes after biases section")]
+    TrailingBytes { extra: usize },
+
     #[error("invalid UTF-8 in name field at offset {offset}: {source}")]
     InvalidUtf8Name {
         offset: u64,

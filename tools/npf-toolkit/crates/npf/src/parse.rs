@@ -281,6 +281,11 @@ impl Network {
         for _ in 0..total_bias_count {
             biases.push(c.read_f32()?);
         }
+        if c.remaining() != 0 {
+            return Err(NpfError::TrailingBytes {
+                extra: c.remaining(),
+            });
+        }
 
         // ---- Shape validation (rules 8 and 9) ----
         validate_input_shape(input_shape, &layers[0])?;
@@ -497,6 +502,17 @@ mod tests {
         assert!(matches!(
             Network::parse(short),
             Err(NpfError::Truncation { .. })
+        ));
+    }
+
+    #[test]
+    fn rejects_trailing_bytes_after_biases() {
+        let mut bytes = build_tiny_bytes();
+        bytes.extend_from_slice(&[0xAA, 0xBB, 0xCC]);
+
+        assert!(matches!(
+            Network::parse(&bytes),
+            Err(NpfError::TrailingBytes { extra: 3 })
         ));
     }
 }
