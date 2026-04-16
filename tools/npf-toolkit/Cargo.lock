@@ -206,6 +206,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "npf-train-xor"
+version = "0.1.0"
+dependencies = [
+ "npf",
+ "rand",
+]
+
+[[package]]
 name = "npf-validate"
 version = "0.1.0"
 dependencies = [
