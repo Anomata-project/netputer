@@ -58,63 +58,6 @@ impl<'a> Cursor<'a> {
     }
 }
 
-fn product_nonzero(shape: [u32; 4]) -> u32 {
-    shape.iter().copied().filter(|&d| d != 0).product()
-}
-
-fn validate_input_shape(shape: [u32; 4], first: &Layer) -> Result<()> {
-    match first {
-        Layer::Dense { in_features, .. } => {
-            let declared = product_nonzero(shape);
-            if declared != *in_features {
-                return Err(NpfError::InputShapeMismatch {
-                    declared: shape,
-                    detail: format!("Dense expects {in_features} inputs"),
-                });
-            }
-        }
-        Layer::Conv2D { in_channels, .. } => {
-            if shape[0] != *in_channels {
-                return Err(NpfError::InputShapeMismatch {
-                    declared: shape,
-                    detail: format!("Conv2D expects {in_channels} input channels (shape[0])"),
-                });
-            }
-        }
-        // Activation/pool/flatten as first layer: no dimensional constraint to check.
-        _ => {}
-    }
-    Ok(())
-}
-
-fn validate_output_shape(shape: [u32; 4], layers: &[Layer]) -> Result<()> {
-    for layer in layers.iter().rev() {
-        match layer {
-            Layer::Dense { out_features, .. } => {
-                let declared = product_nonzero(shape);
-                if declared != *out_features {
-                    return Err(NpfError::OutputShapeMismatch {
-                        declared: shape,
-                        detail: format!("Dense produces {out_features} outputs"),
-                    });
-                }
-                return Ok(());
-            }
-            Layer::Conv2D { out_channels, .. } => {
-                if shape[0] != *out_channels {
-                    return Err(NpfError::OutputShapeMismatch {
-                        declared: shape,
-                        detail: format!("Conv2D produces {out_channels} output channels"),
-                    });
-                }
-                return Ok(());
-            }
-            _ => continue,
-        }
-    }
-    Ok(())
-}
-
 fn read_layer(c: &mut Cursor) -> Result<Layer> {
     let record_offset = c.pos();
     let tag = c.read_u32()?;
@@ -286,10 +229,6 @@ impl Network {
                 extra: c.remaining(),
             });
         }
-
-        // ---- Shape validation (rules 8 and 9) ----
-        validate_input_shape(input_shape, &layers[0])?;
-        validate_output_shape(output_shape, &layers)?;
 
         let header = Header {
             magic,
@@ -468,35 +407,9 @@ mod tests {
         ));
     }
 
-    // Rule 8: input_shape mismatch
+    // Rule 8: truncation
     #[test]
-    fn rule_8_input_shape_mismatch() {
-        let mut bytes = build_tiny_bytes();
-        // input_shape[0] at offset 28 (24 prelude + 4 name)
-        let off = 28;
-        bytes[off..off + 4].copy_from_slice(&99u32.to_le_bytes());
-        assert!(matches!(
-            Network::parse(&bytes),
-            Err(NpfError::InputShapeMismatch { .. })
-        ));
-    }
-
-    // Rule 9: output_shape mismatch
-    #[test]
-    fn rule_9_output_shape_mismatch() {
-        let mut bytes = build_tiny_bytes();
-        // output_shape[0] at offset 44 (24 + 4 name + 16 input_shape)
-        let off = 44;
-        bytes[off..off + 4].copy_from_slice(&99u32.to_le_bytes());
-        assert!(matches!(
-            Network::parse(&bytes),
-            Err(NpfError::OutputShapeMismatch { .. })
-        ));
-    }
-
-    // Rule 10: truncation
-    #[test]
-    fn rule_10_truncation() {
+    fn rule_8_truncation() {
         let bytes = build_tiny_bytes();
         let short = &bytes[..bytes.len() - 2];
         assert!(matches!(
