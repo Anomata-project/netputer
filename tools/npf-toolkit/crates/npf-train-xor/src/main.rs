@@ -78,11 +78,7 @@ fn xavier_limit(fan_in: usize, fan_out: usize) -> f32 {
     (6.0f32 / (fan_in + fan_out) as f32).sqrt()
 }
 
-fn init_dense_weights(
-    rng: &mut StdRng,
-    in_features: usize,
-    out_features: usize,
-) -> Vec<f32> {
+fn init_dense_weights(rng: &mut StdRng, in_features: usize, out_features: usize) -> Vec<f32> {
     let limit = xavier_limit(in_features, out_features);
     let mut weights = Vec::with_capacity(in_features * out_features);
 
@@ -208,17 +204,16 @@ fn train_example(params: &mut Params, input: &[f32; 2], target: f32, learning_ra
 
     let mut grad_dense2_weights = vec![0.0; params.dense2_weights.len()];
     let mut grad_dense2_biases = vec![0.0; params.dense2_biases.len()];
-    for hidden_idx in 0..HIDDEN_FEATURES {
-        grad_dense2_weights[hidden_idx] = delta2 * cache.hidden[hidden_idx];
+    for (hidden_idx, grad) in grad_dense2_weights.iter_mut().enumerate() {
+        *grad = delta2 * cache.hidden[hidden_idx];
     }
     grad_dense2_biases[0] = delta2;
 
-    let mut hidden_delta = vec![0.0; HIDDEN_FEATURES];
-    for hidden_idx in 0..HIDDEN_FEATURES {
+    let mut hidden_delta = [0.0; HIDDEN_FEATURES];
+    for (hidden_idx, delta) in hidden_delta.iter_mut().enumerate() {
         let d_loss_d_hidden = params.dense2_weights[hidden_idx] * delta2;
         // d_tanh/d_z1 = 1 - h^2, using the activated hidden value h.
-        hidden_delta[hidden_idx] =
-            d_loss_d_hidden * (1.0 - cache.hidden[hidden_idx] * cache.hidden[hidden_idx]);
+        *delta = d_loss_d_hidden * (1.0 - cache.hidden[hidden_idx] * cache.hidden[hidden_idx]);
     }
 
     let mut grad_dense1_weights = vec![0.0; params.dense1_weights.len()];
@@ -339,7 +334,8 @@ fn export_trained_network(params: &Params, path: &Path) -> Result<ExportResult, 
         std::fs::create_dir_all(parent)
             .map_err(|err| format!("could not create {}: {err}", parent.display()))?;
     }
-    std::fs::write(path, &bytes).map_err(|err| format!("could not write {}: {err}", path.display()))?;
+    std::fs::write(path, &bytes)
+        .map_err(|err| format!("could not write {}: {err}", path.display()))?;
 
     Ok(ExportResult {
         path: path.to_path_buf(),
