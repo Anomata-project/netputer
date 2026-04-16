@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-use crate::error::Result;
+use crate::error::{NpfError, Result};
 use crate::types::{Layer, Network, PaddingMode, ENDIAN_LE, MAGIC, PRECISION_F32, VERSION};
 
 fn write_layer(out: &mut Vec<u8>, layer: &Layer) {
@@ -56,7 +56,23 @@ fn write_layer(out: &mut Vec<u8>, layer: &Layer) {
 impl Network {
     /// Serialize this network into a fresh byte vector. The CRC32 stored in the
     /// header is computed here; the caller does not need to pre-populate it.
-    pub fn to_bytes(&self) -> Vec<u8> {
+    pub fn to_bytes(&self) -> Result<Vec<u8>> {
+        let expected_weight_count: usize = self.layers.iter().map(Layer::weight_count).sum();
+        if self.weights.len() != expected_weight_count {
+            return Err(NpfError::WeightCountMismatch {
+                expected: expected_weight_count,
+                actual: self.weights.len(),
+            });
+        }
+
+        let expected_bias_count: usize = self.layers.iter().map(Layer::bias_count).sum();
+        if self.biases.len() != expected_bias_count {
+            return Err(NpfError::BiasCountMismatch {
+                expected: expected_bias_count,
+                actual: self.biases.len(),
+            });
+        }
+
         let mut out = Vec::new();
 
         // Weight bytes first, so we can CRC them.
@@ -100,11 +116,11 @@ impl Network {
             out.extend_from_slice(&b.to_le_bytes());
         }
 
-        out
+        Ok(out)
     }
 
     pub fn write_to<W: std::io::Write>(&self, mut w: W) -> Result<()> {
-        let bytes = self.to_bytes();
+        let bytes = self.to_bytes()?;
         w.write_all(&bytes)?;
         Ok(())
     }
@@ -131,7 +147,7 @@ mod tests {
             biases: vec![0.125],
         };
 
-        let bytes = net.to_bytes();
+        let bytes = net.to_bytes().expect("serialize valid network");
         let parsed = Network::parse(&bytes).expect("round-trip parse");
 
         assert_eq!(parsed.header.name, "round");
@@ -140,7 +156,70 @@ mod tests {
         assert_eq!(parsed.biases, net.biases);
 
         // Re-serialize and confirm byte-for-byte identity
-        let bytes2 = parsed.to_bytes();
+        let bytes2 = parsed.to_bytes().expect("re-serialize parsed network");
         assert_eq!(bytes, bytes2);
+    }
+
+    #[test]
+    fn rejects_too_few_weights() {
+        let net = Network {
+            header: Header::new("few-weights", [2, 0, 0, 0], [1, 0, 0, 0]),
+            layers: vec![Layer::Dense {
+                in_features: 2,
+                out_features: 1,
+            }],
+            weights: vec![0.25],
+            biases: vec![0.125],
+        };
+
+        assert!(matches!(
+            net.to_bytes(),
+            Err(NpfError::WeightCountMismatch {
+                expected: 2,
+                actual: 1
+            })
+        ));
+    }
+
+    #[test]
+    fn rejects_too_many_weights() {
+        let net = Network {
+            header: Header::new("many-weights", [2, 0, 0, 0], [1, 0, 0, 0]),
+            layers: vec![Layer::Dense {
+                in_features: 2,
+                out_features: 1,
+            }],
+            weights: vec![0.25, -0.5, 0.75],
+            biases: vec![0.125],
+        };
+
+        assert!(matches!(
+            net.to_bytes(),
+            Err(NpfError::WeightCountMismatch {
+                expected: 2,
+                actual: 3
+            })
+        ));
+    }
+
+    #[test]
+    fn rejects_wrong_bias_count() {
+        let net = Network {
+            header: Header::new("bad-biases", [2, 0, 0, 0], [1, 0, 0, 0]),
+            layers: vec![Layer::Dense {
+                in_features: 2,
+                out_features: 1,
+            }],
+            weights: vec![0.25, -0.5],
+            biases: vec![],
+        };
+
+        assert!(matches!(
+            net.to_bytes(),
+            Err(NpfError::BiasCountMismatch {
+                expected: 1,
+                actual: 0
+            })
+        ));
     }
 }

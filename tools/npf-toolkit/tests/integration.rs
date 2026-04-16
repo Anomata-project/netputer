@@ -35,7 +35,7 @@ fn round_trip_preset(preset: &str) {
 
     let bytes = std::fs::read(&out).expect("read generated file");
     let parsed = Network::parse(&bytes).expect("parse");
-    let reserialized = parsed.to_bytes();
+    let reserialized = parsed.to_bytes().expect("re-serialize parsed file");
 
     assert_eq!(
         bytes, reserialized,

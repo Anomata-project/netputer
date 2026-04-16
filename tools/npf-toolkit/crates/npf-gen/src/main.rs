@@ -154,7 +154,9 @@ fn run(args: Args) -> Result<(), String> {
         .output
         .unwrap_or_else(|| PathBuf::from(args.preset.default_filename()));
 
-    let bytes = net.to_bytes();
+    let bytes = net
+        .to_bytes()
+        .map_err(|e| format!("could not serialize {}: {e}", out_path.display()))?;
     std::fs::write(&out_path, &bytes)
         .map_err(|e| format!("could not write {}: {e}", out_path.display()))?;
 

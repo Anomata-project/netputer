@@ -39,6 +39,12 @@ pub enum NpfError {
     #[error("file has {extra} unexpected bytes after biases section")]
     TrailingBytes { extra: usize },
 
+    #[error("weight count mismatch: expected {expected}, got {actual}")]
+    WeightCountMismatch { expected: usize, actual: usize },
+
+    #[error("bias count mismatch: expected {expected}, got {actual}")]
+    BiasCountMismatch { expected: usize, actual: usize },
+
     #[error("invalid UTF-8 in name field at offset {offset}: {source}")]
     InvalidUtf8Name {
         offset: u64,
