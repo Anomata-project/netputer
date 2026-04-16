@@ -1,11 +1,23 @@
 // SPDX-License-Identifier: Apache-2.0
 use rand::rngs::StdRng;
+use rand::seq::SliceRandom;
 use rand::{Rng, SeedableRng};
+use std::fmt;
 
 const INPUT_FEATURES: usize = 2;
 const HIDDEN_FEATURES: usize = 4;
 const OUTPUT_FEATURES: usize = 1;
 const RNG_SEED: u64 = 42;
+const LEARNING_RATE: f32 = 0.1;
+const MAX_EPOCHS: usize = 10_000;
+const EARLY_STOP_MSE: f32 = 0.01;
+const LOG_INTERVAL: usize = 500;
+const XOR_DATASET: [([f32; 2], f32); 4] = [
+    ([0.0, 0.0], 0.0),
+    ([0.0, 1.0], 1.0),
+    ([1.0, 0.0], 1.0),
+    ([1.0, 1.0], 0.0),
+];
 
 #[derive(Debug, Clone, PartialEq)]
 struct Params {
@@ -13,6 +25,37 @@ struct Params {
     dense1_biases: Vec<f32>,
     dense2_weights: Vec<f32>,
     dense2_biases: Vec<f32>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+struct ForwardCache {
+    hidden_pre: Vec<f32>,
+    hidden: Vec<f32>,
+    output_pre: Vec<f32>,
+    output: Vec<f32>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+struct TrainingSummary {
+    final_epoch: usize,
+    final_loss: f32,
+    stopped_early: bool,
+}
+
+impl fmt::Display for TrainingSummary {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "epoch {} loss {:.6}{}",
+            self.final_epoch,
+            self.final_loss,
+            if self.stopped_early {
+                " (early stop)"
+            } else {
+                ""
+            }
+        )
+    }
 }
 
 fn xavier_limit(fan_in: usize, fan_out: usize) -> f32 {
@@ -84,7 +127,7 @@ fn sigmoid_forward(input: &[f32]) -> Vec<f32> {
         .collect()
 }
 
-fn network_forward(input: &[f32; 2], params: &Params) -> f32 {
+fn forward_cache(input: &[f32; 2], params: &Params) -> ForwardCache {
     let hidden_pre = dense_forward(
         input,
         &params.dense1_weights,
@@ -100,16 +143,140 @@ fn network_forward(input: &[f32; 2], params: &Params) -> f32 {
         HIDDEN_FEATURES,
         OUTPUT_FEATURES,
     );
-    sigmoid_forward(&output_pre)[0]
+    let output = sigmoid_forward(&output_pre);
+
+    ForwardCache {
+        hidden_pre,
+        hidden,
+        output_pre,
+        output,
+    }
+}
+
+fn network_forward(input: &[f32; 2], params: &Params) -> f32 {
+    forward_cache(input, params).output[0]
+}
+
+fn example_loss(output: f32, target: f32) -> f32 {
+    let diff = output - target;
+    diff * diff
+}
+
+fn mean_squared_error(params: &Params) -> f32 {
+    let total_loss: f32 = XOR_DATASET
+        .iter()
+        .map(|(input, target)| example_loss(network_forward(input, params), *target))
+        .sum();
+    total_loss / XOR_DATASET.len() as f32
+}
+
+fn train_example(params: &mut Params, input: &[f32; 2], target: f32, learning_rate: f32) {
+    let cache = forward_cache(input, params);
+    let out = cache.output[0];
+
+    // d_loss/d_out for mean squared error on a single scalar output.
+    let d_loss_d_out = 2.0 * (out - target);
+    // d_out/d_z2 for sigmoid.
+    let delta2 = d_loss_d_out * out * (1.0 - out);
+
+    let mut grad_dense2_weights = vec![0.0; params.dense2_weights.len()];
+    let mut grad_dense2_biases = vec![0.0; params.dense2_biases.len()];
+    for hidden_idx in 0..HIDDEN_FEATURES {
+        grad_dense2_weights[hidden_idx] = delta2 * cache.hidden[hidden_idx];
+    }
+    grad_dense2_biases[0] = delta2;
+
+    let mut hidden_delta = vec![0.0; HIDDEN_FEATURES];
+    for hidden_idx in 0..HIDDEN_FEATURES {
+        let d_loss_d_hidden = params.dense2_weights[hidden_idx] * delta2;
+        // d_tanh/d_z1 = 1 - h^2, using the activated hidden value h.
+        hidden_delta[hidden_idx] =
+            d_loss_d_hidden * (1.0 - cache.hidden[hidden_idx] * cache.hidden[hidden_idx]);
+    }
+
+    let mut grad_dense1_weights = vec![0.0; params.dense1_weights.len()];
+    let mut grad_dense1_biases = vec![0.0; params.dense1_biases.len()];
+    for hidden_idx in 0..HIDDEN_FEATURES {
+        for input_idx in 0..INPUT_FEATURES {
+            grad_dense1_weights[hidden_idx * INPUT_FEATURES + input_idx] =
+                hidden_delta[hidden_idx] * input[input_idx];
+        }
+        grad_dense1_biases[hidden_idx] = hidden_delta[hidden_idx];
+    }
+
+    for (weight, grad) in params
+        .dense2_weights
+        .iter_mut()
+        .zip(grad_dense2_weights.iter())
+    {
+        *weight -= learning_rate * grad;
+    }
+    for (bias, grad) in params
+        .dense2_biases
+        .iter_mut()
+        .zip(grad_dense2_biases.iter())
+    {
+        *bias -= learning_rate * grad;
+    }
+    for (weight, grad) in params
+        .dense1_weights
+        .iter_mut()
+        .zip(grad_dense1_weights.iter())
+    {
+        *weight -= learning_rate * grad;
+    }
+    for (bias, grad) in params
+        .dense1_biases
+        .iter_mut()
+        .zip(grad_dense1_biases.iter())
+    {
+        *bias -= learning_rate * grad;
+    }
+}
+
+fn train_xor(params: &mut Params, rng: &mut StdRng) -> TrainingSummary {
+    let mut training_order = [0usize, 1, 2, 3];
+
+    for epoch in 1..=MAX_EPOCHS {
+        training_order.shuffle(rng);
+        for example_idx in training_order {
+            let (input, target) = XOR_DATASET[example_idx];
+            train_example(params, &input, target, LEARNING_RATE);
+        }
+
+        let loss = mean_squared_error(params);
+        if epoch % LOG_INTERVAL == 0 {
+            println!("epoch {epoch:>5} loss {loss:.6}");
+        }
+        if loss < EARLY_STOP_MSE {
+            println!("epoch {epoch:>5} loss {loss:.6} (stopping)");
+            return TrainingSummary {
+                final_epoch: epoch,
+                final_loss: loss,
+                stopped_early: true,
+            };
+        }
+    }
+
+    let loss = mean_squared_error(params);
+    println!("epoch {:>5} loss {:.6} (max epochs)", MAX_EPOCHS, loss);
+    TrainingSummary {
+        final_epoch: MAX_EPOCHS,
+        final_loss: loss,
+        stopped_early: false,
+    }
 }
 
 fn main() {
     let mut rng = StdRng::seed_from_u64(RNG_SEED);
-    let params = init_params(&mut rng);
+    let mut params = init_params(&mut rng);
+    let summary = train_xor(&mut params, &mut rng);
     println!(
-        "initialized xor network ({} weights, {} biases)",
+        "trained xor network ({} weights, {} biases) {}",
         params.dense1_weights.len() + params.dense2_weights.len(),
         params.dense1_biases.len() + params.dense2_biases.len()
+        ,
+        summary
     );
 }
 
@@ -140,5 +307,24 @@ mod tests {
         let expected: f32 = 1.0 / (1.0 + (-z2).exp());
 
         assert!((actual - expected).abs() < 1e-6);
+    }
+
+    #[test]
+    fn training_reduces_loss() {
+        let mut rng = StdRng::seed_from_u64(RNG_SEED);
+        let mut params = init_params(&mut rng);
+        let initial_loss = mean_squared_error(&params);
+
+        for _ in 0..50 {
+            let mut training_order = [0usize, 1, 2, 3];
+            training_order.shuffle(&mut rng);
+            for example_idx in training_order {
+                let (input, target) = XOR_DATASET[example_idx];
+                train_example(&mut params, &input, target, LEARNING_RATE);
+            }
+        }
+
+        let final_loss = mean_squared_error(&params);
+        assert!(final_loss < initial_loss);
     }
 }
