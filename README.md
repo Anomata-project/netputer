@@ -36,7 +36,7 @@ Every network is a single `.npf` file (Netputer Package Format). Self-describing
 
 Any tool that produces a spec-compliant `.npf` file can target Netputer — a training framework exporter, a code-generation tool, a hand-written binary. The spec is the contract.
 
-→ [NPF Format Specification v1.3](./spec/npf-spec-v1.3.md)
+→ [NPF Format Specification v1.4](./spec/npf-spec.md)
 
 ---
 
@@ -95,7 +95,7 @@ Open an issue or start a discussion. There is no code to PR against yet — that
 ## Further reading
 
 - [White Paper](./docs/netputer-whitepaper.md) — full concept, history, and use cases
-- [NPF Format Specification v1.3](./spec/npf-spec-v1.3.md) — the file format in full detail
+- [NPF Format Specification v1.4](./spec/npf-spec.md) — the file format in full detail
 
 ---
 
