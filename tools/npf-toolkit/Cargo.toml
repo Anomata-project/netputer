@@ -4,6 +4,7 @@ members = [
     "crates/npf",
     "crates/npf-validate",
     "crates/npf-gen",
+    "crates/npf-train-xor",
 ]
 
 [workspace.package]
