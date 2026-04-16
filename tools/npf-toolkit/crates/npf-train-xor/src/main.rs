@@ -5,6 +5,7 @@ use rand::seq::SliceRandom;
 use rand::{Rng, SeedableRng};
 use std::fmt;
 use std::path::{Path, PathBuf};
+use std::process::ExitCode;
 
 const INPUT_FEATURES: usize = 2;
 const HIDDEN_FEATURES: usize = 4;
@@ -48,6 +49,13 @@ struct TrainingSummary {
 struct ExportResult {
     path: PathBuf,
     bytes: Vec<u8>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+struct VerificationRow {
+    input: [f32; 2],
+    expected: f32,
+    actual: f32,
 }
 
 impl fmt::Display for TrainingSummary {
@@ -178,6 +186,17 @@ fn mean_squared_error(params: &Params) -> f32 {
     total_loss / XOR_DATASET.len() as f32
 }
 
+fn outputs_meet_xor_thresholds(params: &Params) -> bool {
+    XOR_DATASET.iter().all(|(input, expected)| {
+        let actual = network_forward(input, params);
+        if *expected == 0.0 {
+            actual < 0.1
+        } else {
+            actual > 0.9
+        }
+    })
+}
+
 fn train_example(params: &mut Params, input: &[f32; 2], target: f32, learning_rate: f32) {
     let cache = forward_cache(input, params);
     let out = cache.output[0];
@@ -256,7 +275,7 @@ fn train_xor(params: &mut Params, rng: &mut StdRng) -> TrainingSummary {
         if epoch % LOG_INTERVAL == 0 {
             println!("epoch {epoch:>5} loss {loss:.6}");
         }
-        if loss < EARLY_STOP_MSE {
+        if loss < EARLY_STOP_MSE && outputs_meet_xor_thresholds(params) {
             println!("epoch {epoch:>5} loss {loss:.6} (stopping)");
             return TrainingSummary {
                 final_epoch: epoch,
@@ -328,11 +347,117 @@ fn export_trained_network(params: &Params, path: &Path) -> Result<ExportResult, 
     })
 }
 
-fn main() {
+fn params_from_network(network: &Network) -> Result<Params, String> {
+    let expected_layers = vec![
+        Layer::Dense {
+            in_features: INPUT_FEATURES as u32,
+            out_features: HIDDEN_FEATURES as u32,
+        },
+        Layer::Tanh,
+        Layer::Dense {
+            in_features: HIDDEN_FEATURES as u32,
+            out_features: OUTPUT_FEATURES as u32,
+        },
+        Layer::Sigmoid,
+    ];
+    if network.layers != expected_layers {
+        return Err(format!(
+            "parsed network has unexpected layer stack: {:?}",
+            network.layers
+        ));
+    }
+
+    let dense1_weight_len = INPUT_FEATURES * HIDDEN_FEATURES;
+    let dense2_weight_len = HIDDEN_FEATURES * OUTPUT_FEATURES;
+    let dense1_bias_len = HIDDEN_FEATURES;
+    let dense2_bias_len = OUTPUT_FEATURES;
+
+    if network.weights.len() != dense1_weight_len + dense2_weight_len {
+        return Err(format!(
+            "parsed network has {} weights, expected {}",
+            network.weights.len(),
+            dense1_weight_len + dense2_weight_len
+        ));
+    }
+    if network.biases.len() != dense1_bias_len + dense2_bias_len {
+        return Err(format!(
+            "parsed network has {} biases, expected {}",
+            network.biases.len(),
+            dense1_bias_len + dense2_bias_len
+        ));
+    }
+
+    Ok(Params {
+        dense1_weights: network.weights[..dense1_weight_len].to_vec(),
+        dense1_biases: network.biases[..dense1_bias_len].to_vec(),
+        dense2_weights: network.weights[dense1_weight_len..].to_vec(),
+        dense2_biases: network.biases[dense1_bias_len..].to_vec(),
+    })
+}
+
+fn verify_rows(params: &Params) -> Vec<VerificationRow> {
+    XOR_DATASET
+        .iter()
+        .map(|(input, expected)| VerificationRow {
+            input: *input,
+            expected: *expected,
+            actual: network_forward(input, params),
+        })
+        .collect()
+}
+
+fn row_is_ok(row: &VerificationRow) -> bool {
+    if row.expected == 0.0 {
+        row.actual < 0.1
+    } else {
+        row.actual > 0.9
+    }
+}
+
+fn format_row(row: &VerificationRow) -> String {
+    format!(
+        "[{}, {}] -> {:.6} (expected {:.1}) {}",
+        row.input[0] as i32,
+        row.input[1] as i32,
+        row.actual,
+        row.expected,
+        if row_is_ok(row) { "OK" } else { "FAIL" }
+    )
+}
+
+fn verify_exported_fixture(path: &Path) -> Result<Vec<VerificationRow>, String> {
+    let bytes = std::fs::read(path)
+        .map_err(|err| format!("could not re-read {}: {err}", path.display()))?;
+    let parsed = Network::parse(&bytes)
+        .map_err(|err| format!("could not parse {} after writing: {err}", path.display()))?;
+    let parsed_params = params_from_network(&parsed)?;
+    let rows = verify_rows(&parsed_params);
+
+    if rows.iter().any(|row| !row_is_ok(row)) {
+        eprintln!("verification failed for {}:", path.display());
+        for row in &rows {
+            eprintln!("{}", format_row(row));
+        }
+        let _ = std::fs::remove_file(path);
+        return Err(format!(
+            "xor fixture verification failed; removed {}",
+            path.display()
+        ));
+    }
+
+    Ok(rows)
+}
+
+fn run() -> Result<(), String> {
     let mut rng = StdRng::seed_from_u64(RNG_SEED);
     let mut params = init_params(&mut rng);
     let summary = train_xor(&mut params, &mut rng);
-    let export = export_trained_network(&params, &fixture_path()).expect("export xor fixture");
+    let export = export_trained_network(&params, &fixture_path())?;
+    let rows = verify_exported_fixture(&export.path)?;
+
+    for row in &rows {
+        println!("{}", format_row(row));
+    }
     println!(
         "trained xor network ({} weights, {} biases) {}, wrote {} ({} bytes)",
         params.dense1_weights.len() + params.dense2_weights.len(),
@@ -341,6 +466,18 @@ fn main() {
         export.path.display(),
         export.bytes.len()
     );
+
+    Ok(())
+}
+
+fn main() -> ExitCode {
+    match run() {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(err) => {
+            eprintln!("ERROR: {err}");
+            ExitCode::FAILURE
+        }
+    }
 }
 
 #[cfg(test)]
