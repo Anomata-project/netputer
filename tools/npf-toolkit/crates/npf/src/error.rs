@@ -27,7 +27,9 @@ pub enum NpfError {
     #[error("CRC32 mismatch: expected {expected:08X}, got {actual:08X}. Weight section may be truncated or corrupted.")]
     CrcMismatch { expected: u32, actual: u32 },
 
-    #[error("file ended before all declared sections were complete (truncation at offset {offset})")]
+    #[error(
+        "file ended before all declared sections were complete (truncation at offset {offset})"
+    )]
     Truncation { offset: u64 },
 
     #[error("file has {extra} unexpected bytes after biases section")]

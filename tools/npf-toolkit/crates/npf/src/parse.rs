@@ -110,11 +110,10 @@ fn read_layer(c: &mut Cursor) -> Result<Layer> {
             let stride_w = c.read_u32()?;
             let pad_offset = c.pos();
             let pad_raw = c.read_u32()?;
-            let padding_mode =
-                PaddingMode::from_u32(pad_raw).ok_or(NpfError::BadPaddingMode {
-                    got: pad_raw,
-                    offset: pad_offset,
-                })?;
+            let padding_mode = PaddingMode::from_u32(pad_raw).ok_or(NpfError::BadPaddingMode {
+                got: pad_raw,
+                offset: pad_offset,
+            })?;
             Layer::Conv2D {
                 in_channels,
                 out_channels,
@@ -280,7 +279,7 @@ mod tests {
         out.extend_from_slice(&crc.to_le_bytes()); // checksum
         out.extend_from_slice(&4u32.to_le_bytes()); // name_len
         out.extend_from_slice(b"test"); // name
-        // input_shape [2,0,0,0]
+                                        // input_shape [2,0,0,0]
         out.extend_from_slice(&2u32.to_le_bytes());
         out.extend_from_slice(&0u32.to_le_bytes());
         out.extend_from_slice(&0u32.to_le_bytes());
@@ -389,7 +388,10 @@ mod tests {
         bytes[off..off + 4].copy_from_slice(&0xDEADBEEFu32.to_le_bytes());
         assert!(matches!(
             Network::parse(&bytes),
-            Err(NpfError::UnknownLayerType { tag: 0xDEADBEEF, .. })
+            Err(NpfError::UnknownLayerType {
+                tag: 0xDEADBEEF,
+                ..
+            })
         ));
     }
 

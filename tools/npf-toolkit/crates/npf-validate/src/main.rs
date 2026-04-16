@@ -5,7 +5,10 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 #[derive(Parser, Debug)]
-#[command(name = "npf-validate", about = "Validate a Netputer Package Format (.npf) file.")]
+#[command(
+    name = "npf-validate",
+    about = "Validate a Netputer Package Format (.npf) file."
+)]
 struct Args {
     /// Path to the .npf file to validate.
     file: PathBuf,
